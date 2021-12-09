@@ -1,0 +1,763 @@
+// Copyright 2020 Drud Technologies.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package ddev.sites.v1alpha1;
+
+import "live/sites/v1alpha1/metadata.proto";
+
+option go_package = "github.com/drud/ddev-apis-go/live/sites/v1alpha1";
+option java_multiple_files = true;
+option java_outer_classname = "SiteProto";
+option java_package = "com.ddev.live.sites.v1alpha1";
+
+
+enum SiteType {
+  /*
+  NOT_SET indicates no type of site has been specified
+  */
+  NOT_SET = 0;
+  DRUPAL = 1;
+  TYPO3 = 2;
+  WORDPRESS = 3;
+}
+
+enum CloneOperationState {
+    CLONE_CREATED = 0;
+    CLONE_SUCCEEDED = 1;
+    CLONE_FAILED = 2;
+}
+
+/*
+Defines the overall status of a site.  A site is defined as health when all substatus elements are true.
+*/
+message SiteStatus {
+  // Server healthy status
+  bool server = 1;
+  // Database healthy status
+  bool database = 2;
+  // Filestore healthy status
+  bool filestore = 3;
+}
+
+message GitRepository {
+  /*
+  The URL of the repository
+  */
+  string url = 1;
+
+  /*
+  The branch, tag, or commit.  Default: `master`.
+  */
+  string ref = 2;
+}
+
+// Cron manages if and when the CMS cron executes
+message Cron {
+
+  /*
+  `Optional`
+  Disabled will stop the CMS cron from executing.  Default true.
+  */
+  bool disabled = 1;
+ 
+  /*
+  Schedule specifies when this process will execute using CronTab notation.
+  */
+  string schedule = 2;
+}
+
+// CustomCron manages when and what a custom cron executes
+message CustomCron {
+
+  /*
+  Command will be the custom command to be run on the schedule set.
+  */
+  string command = 1;
+
+  /*
+  Schedule specifies when this process will execute using CronTab notation.
+  */
+  string schedule = 2;
+}
+
+message Site {
+
+  // because you cannot use repeated oneof we must wrap oneof in a repeatable message
+
+  string name = 1;
+
+  string workspace = 2;
+  
+  /*
+  */
+  oneof Repository {
+    GitRepository git = 3;
+  }
+
+  /*
+  The type of the CMS used for the site
+  */
+  SiteType type = 4;
+
+  /*
+  The URLs for the site
+  */
+  repeated string urls = 5;
+
+  /*
+  Creation Timestamp of site using RFC-3339
+  */
+  string creationTime = 6;
+  
+  // NOTE: when beta, clean up attribute number 
+  message Attributes {
+    /*
+    `Optional`
+    Specify tags for a site
+    */
+    map<string, string> tags = 16;
+
+    /*
+    `Optional`
+    */
+    Cron cron = 21;
+
+    /*
+    `Optional`
+    Specify the amount of time after which the site should be considered expired and garbage collected. Supported units are minutes, hours, days, with max of 5 days (e.g. 90m, 3h, 5d, etc.), empty string means no expiration.
+    */
+    string expiry = 25;
+
+    /*
+    `Optional`
+    Specify a list of desired custom cron commands & their schedules to be run on.
+    */
+    repeated CustomCron customCron = 27;
+  }
+  /*
+  `Optional`
+  A set of different status descriptions for a site
+  */
+  SiteStatus status = 15;
+
+  /*
+    `Optional`
+    Mutable attributes for a site.
+  */
+  Attributes attributes = 16;
+  
+  /*
+  `Optional`
+  The version of the CMS used for the site
+  */
+  string version = 18;
+
+  /*
+  `Optional`
+  Whether to run composer install when creating the site image
+  */
+  bool composerInstall = 19;
+
+  /*
+  `Optional`
+  If `composerInstall` is set, use this flags to specify which args are passed to composer install
+  */
+  repeated string composerArgs = 20;
+
+  /*
+  `Optional`
+  `Deprecated`
+  Please use Attributes.Cron
+  */
+  Cron cron = 21;
+
+  /*
+  `Optional`
+  The relative docroot of the site, like 'docroot' or 'htdocs' or 'web'. Defaults to empty, the repository's root directory.
+  */
+  string DocRoot = 22;
+  
+  /*
+  `Optional`
+  A list of persistent mount paths relative to docroot (ex. content/uploads). 
+  */
+  repeated string persistentPaths = 23;
+
+  /*
+  `Optional`
+  A list of ephemeral mount paths relative to docroot
+  */
+  repeated string ephemeralPaths = 24;
+
+  /*
+  `Optional`
+  Specify the version of PHP for the site
+  */
+  string phpVersion = 26;
+}
+
+message CloneOperation {
+
+  /*
+  `OutputOnly`
+  Reference to the clone site operation 
+  */
+  string ref = 1;
+  
+  /*
+  `OutputOnly`
+  Name of the origin site
+  */
+  string originSite = 2;
+
+  /*
+  `OutputOnly`
+  Name of the new site
+  */
+  string newSite = 3;
+
+  /*
+  `OutputOnly`
+  State of the clone operation
+  */
+  CloneOperationState state = 4;
+  
+  /*
+  `OutputOnly`
+  Optionally contains additional human readable information describing the state of the operation
+  */
+  string info = 5;
+}
+
+message CloneRequest {
+
+  /*
+  `Required`
+  The name of the origin site
+  */
+  string originSite = 1;
+
+  /*
+  `Required`
+  The name of the new site
+  */
+  string newSite = 2;
+  
+  /*
+  `Optional`
+  Arguments to override git repository or revision
+  */
+  oneof Repository {
+    GitRepository git = 16;
+  }
+
+  // TODO: Future
+  /*
+  `Optional`
+  Override to use a db backup instead of the origin's site database
+  */
+  // string dbBackup = 17;
+
+  /*
+  `Optional`
+  Override to the a filestore backup instead of the origin's site filestore
+  */
+  // string fsBackup = 18;
+}
+
+message CloneResponse {
+  /*
+  `OutputOnly`
+  Reference to the clone site operation 
+  */
+  string operationRef = 1;
+}
+
+message DescribeCloneRequest {
+  /*
+  `Required`
+  Reference to the clone site operation 
+  */
+  string operationRef = 1;
+}
+
+message DescribeCloneResponse {
+  /*
+  `OutputOnly`
+  Reference to the clone site operation 
+  */
+  CloneOperationState state = 1;
+
+  /*
+  `OutputOnly`
+  Reference to the created site resource as a result of the clone operation.  This field will be an empty string if the clone operation was not successful
+  */
+  string cloneRef = 2;
+
+  /*
+  `OutputOnly`
+  Object metadata for the clone resource.
+  */
+  Metadata meta = 3;
+
+  /*
+  `OutputOnly`
+  Detailed description of the state
+  */
+  string stateDetail = 17;
+
+}
+
+message DeleteCloneRequest {
+  /*
+  `Required`
+  Reference to the clone site operation 
+  */
+  string operationRef = 1;
+}
+
+message DeleteCloneResponse {
+}
+
+message ListCloneSiteOperationsRequest {}
+
+message ListCloneSiteOperationsResponse {
+  /*
+  `OutputOnly`
+  List of clone site operations
+  */
+  repeated CloneOperation items = 1;
+}
+
+message TriggerCloneRefreshRequest {
+  /*
+  `Required`
+  Reference to the clone site operation 
+  */
+  string operationRef = 1;
+
+  /*
+  `Optional`
+  Whether the site should be cloned again
+  */
+  bool server = 16;
+  
+  /*
+  `Optional`
+  Whether the database should be cloned again
+  */
+  bool database = 17;
+
+  /*
+  `Optional`
+  Whether the filestore should be cloned again
+  */
+  bool filestore = 18;
+}
+
+message TriggerCloneRefreshResponse {
+}
+
+message ListClonesForSiteRequest {
+  /*
+  `Required`
+  List all clones for a particular origin site
+  */
+  string originSite = 1;
+}
+
+message ListClonesForSiteResponse {
+  /*
+  `OutputOnly`
+  List all clones for a particular origin site
+  */
+  repeated Site clones = 1;
+}
+
+message CreateSiteRequest {
+
+  /*
+  `Required`
+  The name of the site
+  */
+  string name = 1;
+
+  /*
+  `Required`
+  */
+  oneof Repository {
+    GitRepository git = 3;
+  }
+
+  /*
+  `Required`
+  The type of the CMS used for the site
+  */
+  SiteType type = 4;
+
+  /*
+  `Optional`
+  Specify tags for a site
+  */
+  map<string, string> tags = 16;
+
+  /*
+  `Optional`
+  The version of the CMS used for the site
+  */
+  string version = 18;
+
+  /*
+  `Optional`
+  Whether to run composer install when creating the site image
+  */
+  bool composerInstall = 19;
+
+  /*
+  `Optional`
+  If `composerInstall` is set, use this flags to specify which args are passed to composer install
+  */
+  repeated string composerArgs = 20;
+
+  /*
+  `Optional`
+  */
+  Cron cron = 21;
+
+  /*
+  `Optional`
+  The relative docroot of the site, like 'docroot' or 'htdocs' or 'web'. Defaults to empty, the repository's root directory.
+  */
+  string DocRoot = 22;
+  
+  /*
+  `Optional`
+  A list of persistent mount paths relative to docroot (ex. content/uploads). 
+  */
+  repeated string persistentPaths = 23;
+
+  /*
+  `Optional`
+  A list of ephemeral mount paths relative to docroot
+  */
+  repeated string ephemeralPaths = 24;
+
+  /*
+  `Optional`
+  Specify the amount of time after which the site should be considered expired and garbage collected. Supported units are minutes, hours, days, with max of 5 days (e.g. 90m, 3h, 5d, etc.), empty string means no expiration.
+  */
+  string expiry = 25;
+  
+  /*
+  `Optional`
+  Specify the version of PHP for the site
+  */
+  string phpVersion = 26;
+
+  /*
+    `Optional`
+    Specify a list of desired custom cron commands & their schedules to be run on.
+    */
+  repeated CustomCron customCron = 27;
+}
+
+/*
+*/
+message CreateSiteResponse {
+
+  /*
+  `OutputOnly`
+  The properties of the site which was created.
+  */
+  Site site = 1;
+}
+
+/*
+*/
+message GetSiteRequest {
+
+  /*
+  `Required`
+  The name of the site
+  */
+  string name = 1;
+}
+
+/*
+*/
+message GetSiteResponse {
+
+  /*
+  `OutputOnly`
+  The requested site.
+  */
+  Site site = 1;
+}
+
+/*
+*/
+message ListSiteRequest {
+}
+
+/*
+*/
+message ListSiteResponse {
+
+  /*
+  `OutputOnly`
+  A list of sites.
+  */
+  repeated Site sites = 1;
+}
+
+message UpdateSiteRequest {
+
+  /*
+  `Required`
+  The requested site.
+  */
+  Site site = 1;
+}
+
+message UpdateSiteResponse {
+  /*
+  `OutputOnly`
+  The requested site.
+  */
+  Site site = 1;
+}
+
+/*
+*/
+message DeleteSiteRequest {
+
+  /*
+  `Required`
+  The name of the site
+  */
+  string name = 1;
+}
+
+/*
+*/
+message DeleteSiteResponse {
+
+  /*
+  `OutputOnly`
+  The name of the site
+  */
+  Site site = 1;
+}
+
+message LogOptions {
+  /*
+  `Optional`
+  Continues to follow and send logs until the maximum allotted connection time has been reached.
+  Defaults to false.
+  */
+  bool follow = 1;
+
+  /*
+  `Optional`
+  The approximate number of bytes to return from the message.
+  */
+  int64 limitBytes = 2;
+
+  /*
+  `Optional`
+  Retrieves the logs for a previously terminated run of the site
+  */
+  bool previous = 3;
+
+  /*
+  `Optional`
+  The number of seconds from now to retrieve logs
+  */
+  int64 sinceSeconds = 4;
+
+  /*
+  `Optional`
+  An RFC3999 formatted timestamp to start retrieving logs from
+  */
+  string sinceTime = 5;
+
+  /*
+  `Optional`
+  The number of lines to retrieve at the tail end of a log
+  */
+  int64 taillines = 6;
+
+  /*
+  `Optional`
+  Will prepend RFC3999 timestamps at the beginning of each log line
+  */
+  bool timestamps = 7;
+}
+
+/*
+*/
+message SiteLogsRequest {
+
+  /*
+  `Required`
+  The name of the site
+  */
+  string name = 1;
+
+  /*
+  `Optional`
+  Additional options for logging
+  */
+  LogOptions options = 17;
+
+}
+
+/*
+*/
+message SiteLogsResponse {
+
+  /*
+  TODO
+  */
+  bytes content = 1;
+}
+
+/*
+*/
+message AccessLogsRequest {
+
+  /*
+  `Required`
+  The name of the site
+  */
+  string name = 1;
+
+  /*
+  `Optional`
+  Additional options for logging
+  */
+  LogOptions options = 17;
+}
+
+/*
+*/
+message AccessLogsResponse {
+
+  /*
+  TODO
+  */
+  bytes content = 1;
+}
+
+/*
+*/
+message MysqlLogsRequest {
+
+  /*
+  `Required`
+  The name of the site
+  */
+  string name = 1;
+
+  /*
+  `Optional`
+  Additional options for logging
+  */
+  LogOptions options = 17;
+}
+
+/*
+*/
+message MysqlLogsResponse {
+
+  /*
+  TODO
+  */
+  bytes content = 1;
+}
+
+/*
+*/
+message BuildLogsRequest {
+
+  /*
+  `Required`
+  The name of the site
+  */
+  string name = 1;
+
+  /*
+  `Optional`
+  Additional options for logging
+  */
+  LogOptions options = 17;
+}
+
+/*
+*/
+message BuildLogsResponse {
+
+  /*
+  `OutputOnly` A named scope to which these log messages apply
+  */
+  string scope = 1;
+
+  /*
+  `OutputOnly` The log data for this scope of logs
+  */
+  bytes content = 2;
+
+}
+
+/*
+*/
+message SiteExecRequest {
+
+  /*
+  The name of the site to run a command against
+  */
+  string name = 1;
+
+  /*
+  The command to run against the site
+  */
+  repeated string command = 2;
+
+  /*
+  Interactive specifies the if the stream will continue to listen for input after the inital command
+  */
+  bool interactive = 16;
+
+  /*
+  */
+  bool quiet = 17;
+}
+
+/*
+TODO:
+*/
+message SiteExecResponse {
+
+  /*
+  TODO
+  */
+  bytes stdout = 1;
+
+  /*
+  TODO
+  */
+  bytes stderr = 2;
+}

@@ -1,0 +1,209 @@
+// Copyright 2020 Drud Technologies.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package ddev.sites.v1alpha1;
+
+option go_package = "github.com/drud/ddev-apis-go/live/sites/v1alpha1";
+option java_multiple_files = true;
+option java_outer_classname = "DatabaseProto";
+option java_package = "com.ddev.live.sites.v1alpha1";
+
+enum BackupState {
+  CREATED = 0;
+  FINISHED = 1;
+  DELETED = 2;
+}
+
+message DatabaseBackup {
+
+  /*
+  Metadata information about this backup
+  */
+  DatabaseBackupMetadata metadata = 1;
+
+  /*
+  The raw bytes the the content.
+  Supported MIME Types: `gz`
+  */
+  bytes content = 5;
+
+  /*
+  `Optional`
+  CRC32c checksum of the data, as described in RFC 4960, Appendix B; encoded using base64 in big-endian byte order.  In the event of streaming requests the CRC32c shall represent the checksum of the entire file.  If provided a checksum mismatch will result in an error on the receiver.
+  */
+  string CRC32c = 17;
+
+  /*
+  `Optional`
+  MD5 hash of the data; encoded using base64.  In the event of streaming requests the MD5 shall represent the checksum of the entire file.   If provided a checksum mismatch will result in an error on the receiver.
+  */
+  string MD5 = 18;
+}
+
+/*
+The backup object
+*/
+message DatabaseBackupMetadata {
+  
+  /*
+  The name of the backup
+  */
+  string name = 1;
+
+  /*
+  The database this backup references
+  */
+  string databaseReference = 2;
+
+  /*
+  `OutputOnly`
+  The unix timestamp in which this backup was taken
+  */
+  int64 created = 3;
+
+  /*
+  `OutputOnly`
+  The state of this backup
+  */
+  BackupState state = 4;
+}
+
+
+//
+// Message Types
+//
+
+/*
+*/
+message BackupDatabaseRequest {
+
+  /*
+  `Required`
+  The name of the site to backup.
+  */
+  string site = 1;
+
+}
+
+/*
+*/
+message BackupDatabaseResponse {
+
+  /*
+  The state of the backup
+  */
+  DatabaseBackupMetadata backup = 1;
+}
+
+/*
+*/
+message RestoreDatabaseRequest {
+
+  /*
+  `Required`
+  The name of the site to restore.
+  */
+  string site = 1;
+
+  /*
+  `Required`
+  The name of the backup to restore the site to.
+  */
+  string backup = 2;
+
+}
+
+/*
+*/
+message RestoreDatabaseResponse {
+
+  /*
+  The state of the backup
+  */
+  DatabaseBackupMetadata backup = 1;
+}
+
+/*
+Push a single database to a site
+*/
+message PushDatabaseBackupRequest {
+
+  /*
+  `Required`
+  The name of the site to push to.
+  */
+  string site = 1;
+
+  /*
+  The backup object
+  */
+  DatabaseBackup backup = 2;
+}
+
+/*
+*/
+message PushDatabaseBackupResponse {
+
+  /*
+  The name of the restorable backup resource
+  */
+  string backup = 1;
+}
+
+/*
+Pull database pulls the state of a specified database backup
+*/
+message PullDatabaseBackupRequest {
+
+  /*
+  `Required`
+  The name of the backup to pull.
+  */
+  string backup = 1;
+}
+
+/*
+*/
+message PullDatabaseBackupResponse {
+
+  /*
+  `OutputOnly`
+  The backup object
+  */
+  DatabaseBackup backup = 1;
+}
+
+/*
+*/
+message ListDatabaseBackupsRequest {
+
+  /*
+  `Required`
+  The name of the site
+  */
+  string site = 1;
+}
+
+/*
+*/
+message ListDatabaseBackupsResponse {
+  
+  /*
+  `OutputOnly`
+  The metadata for all backup objects.
+  */
+  repeated DatabaseBackupMetadata backup = 1;
+}

@@ -1,0 +1,84 @@
+name: Release
+on: 
+  push:
+    tags:
+      - "*"
+jobs:
+  publish:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@master
+      - name: tagger
+        uses: drud/action-tagger@v1
+        id: tagger
+      - name: prep npm
+        run: |
+          sudo apt update
+          sudo apt install -y nodejs-dev node-gyp libssl1.0-dev
+          sudo apt install -y npm
+      - name: prep protoc
+        run: |
+          wget https://github.com/protocolbuffers/protobuf/releases/download/v3.12.3/protoc-3.12.3-linux-x86_64.zip
+          unzip protoc-3.12.3-linux-x86_64.zip
+          sudo cp bin/protoc /usr/local/bin/protoc
+          sudo chmod a+x /usr/local/bin/protoc
+
+          export GOPATH="$HOME/go"
+          mkdir -p $GOPATH
+
+          # Fetch necessary protoc modules
+          go get github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway
+          go get github.com/golang/protobuf/protoc-gen-go
+
+          # ensure these binaries are on the path
+          sudo cp $GOPATH/bin/protoc-gen-grpc-gateway /usr/local/bin
+          sudo cp $GOPATH/bin/protoc-gen-go /usr/local/bin
+
+          # manually retrieve the grpc-web binary
+          wget https://github.com/grpc/grpc-web/releases/download/1.1.0/protoc-gen-grpc-web-1.1.0-linux-x86_64
+          sudo mv protoc-gen-grpc-web-1.1.0-linux-x86_64 /usr/local/bin/protoc-gen-grpc-web
+          sudo chmod a+x /usr/local/bin/protoc-gen-grpc-web
+      - name: prep git
+        run: |
+          git config --global user.email "cicd@ddev.com"
+          git config --global user.name "API CI Runner"
+      - name: build-go
+        run: |
+          make build-go
+          dir=$(file bazel-bin | sed 's/bazel-bin: symbolic link to \(.*\)/\1/')
+          rm -f bazel-bin
+          cp -r $dir bazel-bin
+          git clone https://${{ secrets.GIT_BUILD_TOKEN }}:x-oauth-basic@github.com/drud/ddev-apis-go.git
+          cd ddev-apis-go
+          git checkout -b ${{steps.tagger.outputs.tag}}
+          # copy the new admin-api artifacts
+          rsync -avh ../bazel-bin/admin_grpc/live/administration/ live/administration --delete
+          # copy the new site-api artifacts
+          rsync -avh ../bazel-bin/site_grpc/live/sites/ live/sites --delete
+          git add --all
+          git commit -m "CI Runner"
+          git push --set-upstream origin ${{steps.tagger.outputs.tag}}
+      - name: release-node
+        run: |
+          make build-js
+          cd build/js
+          # initialize the npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{secrets.GITHUB_TOKEN}}" > ~/.npmrc
+          npm config set registry  "https://npm.pkg.github.com/"
+
+          # Set the version for this release
+          npmVersion=$(echo ${{steps.tagger.outputs.tag}} | sed s%^v%%)
+          npm version $npmVersion
+          npm publish
+      - name: release-web
+        run: |
+          make build-ts
+          cd build/ts
+          # initialize the npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{secrets.GITHUB_TOKEN}}" > ~/.npmrc
+          npm config set registry  "https://npm.pkg.github.com/"
+
+          # Set the version for this release
+          npmVersion=$(echo ${{steps.tagger.outputs.tag}} | sed s%^v%%)
+          npm version $npmVersion
+          npm publish --access public
